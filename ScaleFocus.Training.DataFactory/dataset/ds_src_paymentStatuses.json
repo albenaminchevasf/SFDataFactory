@@ -2,7 +2,7 @@
 	"name": "ds_src_paymentStatuses",
 	"properties": {
 		"linkedServiceName": {
-			"referenceName": "sf_training_datalake",
+			"referenceName": "ls_sftraining_datalake",
 			"type": "LinkedServiceReference"
 		},
 		"annotations": [],
