@@ -1,0 +1,11 @@
+{
+	"name": "ls_kv_sf_training",
+	"properties": {
+		"description": "Linked service to ScaleFocus training Key Vault service",
+		"annotations": [],
+		"type": "AzureKeyVault",
+		"typeProperties": {
+			"baseUrl": "https://kv-sf-training.vault.azure.net/"
+		}
+	}
+}
