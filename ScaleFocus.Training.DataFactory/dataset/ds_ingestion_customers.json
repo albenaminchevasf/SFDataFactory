@@ -5,6 +5,9 @@
 			"referenceName": "ls_sftraining_ingestion_db",
 			"type": "LinkedServiceReference"
 		},
+		"folder": {
+			"name": "ingestion"
+		},
 		"annotations": [],
 		"type": "AzureSqlTable",
 		"schema": [
