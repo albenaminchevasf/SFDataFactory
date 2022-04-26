@@ -1,0 +1,152 @@
+{
+	"name": "df_GOLDEN_PAYMENTS",
+	"properties": {
+		"folder": {
+			"name": "golden"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "ds_curation_payments",
+						"type": "DatasetReference"
+					},
+					"name": "CurPayments"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_golden_bank_statuses",
+						"type": "DatasetReference"
+					},
+					"name": "GoldBankStatus"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_golden_payment_statuses",
+						"type": "DatasetReference"
+					},
+					"name": "GoldPaymentStatus"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "ds_golden_payments",
+						"type": "DatasetReference"
+					},
+					"name": "GoldenPayments"
+				}
+			],
+			"transformations": [
+				{
+					"name": "lkpBankStatus"
+				},
+				{
+					"name": "lkpPaymentStatus"
+				},
+				{
+					"name": "SelectColumns"
+				},
+				{
+					"name": "UpdateOrInsert"
+				},
+				{
+					"name": "AddAndCastColumns"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          PaymentId as integer,",
+				"          PaymentIdentifier as string,",
+				"          UniqueCustomerNumber as string,",
+				"          BankStatusCode as string,",
+				"          PaymentStatusName as string,",
+				"          PaymentAmount as decimal(18,2),",
+				"          Deduction as decimal(18,2),",
+				"          PaymentDate as timestamp,",
+				"          CreatedOn as timestamp",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> CurPayments",
+				"source(output(",
+				"          BankStatusId as integer,",
+				"          BankStatusCode as string,",
+				"          BankStatusName as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> GoldBankStatus",
+				"source(output(",
+				"          PaymentStatusId as integer,",
+				"          PaymentStatusName as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> GoldPaymentStatus",
+				"CurPayments, GoldBankStatus lookup(CurPayments@BankStatusCode == GoldBankStatus@BankStatusCode,",
+				"     multiple: false,",
+				"     pickup: 'any',",
+				"     broadcast: 'auto')~> lkpBankStatus",
+				"lkpBankStatus, GoldPaymentStatus lookup(CurPayments@PaymentStatusName == GoldPaymentStatus@PaymentStatusName,",
+				"     multiple: false,",
+				"     pickup: 'any',",
+				"     broadcast: 'auto')~> lkpPaymentStatus",
+				"lkpPaymentStatus select(mapColumn(",
+				"          PaymentIdentifier,",
+				"          UniqueCustomerNumber,",
+				"          BankStatusId,",
+				"          PaymentStatusId,",
+				"          PaymentAmount,",
+				"          Deduction,",
+				"          PaymentDate,",
+				"          CreatedOn",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> SelectColumns",
+				"AddAndCastColumns alterRow(upsertIf(true())) ~> UpdateOrInsert",
+				"SelectColumns derive(ModifiedOn = currentUTC(),",
+				"          BankStatusId = toString(BankStatusId),",
+				"          PaymentStatusId = toString(PaymentStatusId)) ~> AddAndCastColumns",
+				"UpdateOrInsert sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          PaymentId as integer,",
+				"          PaymentIdentifier as string,",
+				"          UniqueCustomerNumber as string,",
+				"          BankStatusId as string,",
+				"          PaymentStatusId as string,",
+				"          PaymentAmount as decimal(18,2),",
+				"          Deduction as decimal(18,2),",
+				"          PaymentDate as timestamp,",
+				"          CreatedOn as timestamp,",
+				"          ModifiedOn as timestamp",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:false,",
+				"     updateable:false,",
+				"     upsertable:true,",
+				"     keys:['PaymentIdentifier'],",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          PaymentIdentifier,",
+				"          UniqueCustomerNumber,",
+				"          BankStatusId,",
+				"          PaymentStatusId,",
+				"          PaymentAmount,",
+				"          Deduction,",
+				"          PaymentDate,",
+				"          CreatedOn,",
+				"          ModifiedOn",
+				"     )) ~> GoldenPayments"
+			]
+		}
+	}
+}
