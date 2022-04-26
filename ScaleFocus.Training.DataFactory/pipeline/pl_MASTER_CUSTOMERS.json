@@ -45,6 +45,26 @@
 					},
 					"waitOnCompletion": true
 				}
+			},
+			{
+				"name": "Golden Customers",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Curate Customers",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_GOLDEN_CUSTOMERS",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
 			}
 		],
 		"annotations": []
