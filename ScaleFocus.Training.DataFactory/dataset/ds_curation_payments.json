@@ -25,11 +25,11 @@
 				"type": "nvarchar"
 			},
 			{
-				"name": "BankStatusId",
+				"name": "BankStatusCode",
 				"type": "nvarchar"
 			},
 			{
-				"name": "PaymentStatusId",
+				"name": "PaymentStatusName",
 				"type": "nvarchar"
 			},
 			{
@@ -46,12 +46,6 @@
 			},
 			{
 				"name": "CreatedOn",
-				"type": "datetime",
-				"precision": 23,
-				"scale": 3
-			},
-			{
-				"name": "ModifiedOn",
 				"type": "datetime",
 				"precision": 23,
 				"scale": 3
