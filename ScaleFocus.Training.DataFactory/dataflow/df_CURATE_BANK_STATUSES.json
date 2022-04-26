@@ -75,18 +75,13 @@
 				"          BankStatusName as string",
 				"     ),",
 				"     deletable:false,",
-				"     insertable:false,",
+				"     insertable:true,",
 				"     updateable:false,",
 				"     upsertable:true,",
-				"     keys:['BankStatusCode','BankStatusName'],",
+				"     keys:['BankStatusCode'],",
 				"     format: 'table',",
-				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
-				"     errorHandlingOption: 'stopOnFirstError',",
-				"     mapColumn(",
-				"          BankStatusCode = IngBankStatuses@BankStatusCode,",
-				"          BankStatusName = IngBankStatuses@BankStatusName",
-				"     )) ~> CurateBankStatuses"
+				"     errorHandlingOption: 'stopOnFirstError') ~> CurateBankStatuses"
 			]
 		}
 	}
