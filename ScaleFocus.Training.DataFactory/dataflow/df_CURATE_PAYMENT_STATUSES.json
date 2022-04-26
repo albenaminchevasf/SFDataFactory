@@ -13,6 +13,13 @@
 						"type": "DatasetReference"
 					},
 					"name": "IngPaymentStatuses"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_curation_paymentStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "CurPaymentStatuses"
 				}
 			],
 			"sinks": [
@@ -24,7 +31,11 @@
 					"name": "CurTragetPaymentStatuses"
 				}
 			],
-			"transformations": [],
+			"transformations": [
+				{
+					"name": "RecordDoesntExist"
+				}
+			],
 			"scriptLines": [
 				"source(output(",
 				"          PaymentStatusId as integer,",
@@ -34,17 +45,27 @@
 				"     validateSchema: false,",
 				"     isolationLevel: 'READ_UNCOMMITTED',",
 				"     format: 'table') ~> IngPaymentStatuses",
-				"IngPaymentStatuses sink(allowSchemaDrift: true,",
+				"source(output(",
+				"          PaymentStatusId as integer,",
+				"          PaymentStatusName as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> CurPaymentStatuses",
+				"IngPaymentStatuses, CurPaymentStatuses exists(IngPaymentStatuses@PaymentStatusName == CurPaymentStatuses@PaymentStatusName,",
+				"     negate:true,",
+				"     broadcast: 'auto')~> RecordDoesntExist",
+				"RecordDoesntExist sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
 				"          PaymentStatusId as integer,",
 				"          PaymentStatusName as string",
 				"     ),",
 				"     deletable:false,",
-				"     insertable:false,",
+				"     insertable:true,",
 				"     updateable:false,",
 				"     upsertable:false,",
-				"     truncate:true,",
 				"     format: 'table',",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
