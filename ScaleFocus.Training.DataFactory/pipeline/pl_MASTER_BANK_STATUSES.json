@@ -45,6 +45,26 @@
 					},
 					"traceLevel": "Fine"
 				}
+			},
+			{
+				"name": "Golden Bank Statuses",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Curate Bank Statuses",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_GOLDEN_BANK_STATUSES",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
 			}
 		],
 		"annotations": []
