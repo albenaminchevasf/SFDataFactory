@@ -93,7 +93,8 @@
 									"type": "DateTime"
 								}
 							}
-						]
+						],
+						"mapComplexValuesToString": true
 					}
 				},
 				"inputs": [
@@ -117,14 +118,8 @@
 						"referenceName": "ds_ingestion_payments",
 						"type": "DatasetReference",
 						"parameters": {
-							"schemaName": {
-								"value": "@activity('Get Params').output.firstRow.SchemaName",
-								"type": "Expression"
-							},
-							"tableName": {
-								"value": "@activity('Get Params').output.firstRow.IngestionTableName",
-								"type": "Expression"
-							}
+							"schemaName": "am",
+							"tableName": "Payments"
 						}
 					}
 				]
