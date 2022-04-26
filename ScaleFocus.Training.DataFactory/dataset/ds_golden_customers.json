@@ -67,6 +67,12 @@
 			{
 				"name": "IsActive",
 				"type": "bit"
+			},
+			{
+				"name": "LastPipelineRun",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
 			}
 		],
 		"typeProperties": {
