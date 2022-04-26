@@ -125,7 +125,7 @@
 				"     errorHandlingOption: 'stopOnFirstError',",
 				"     mapColumn(",
 				"          BankStatusCode = ING_BankStatusCode,",
-				"          BankStatusName = ING_BankStatusCode",
+				"          BankStatusName = ING_BankStatusName",
 				"     )) ~> UpdateBankStatuses"
 			]
 		}
