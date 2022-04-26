@@ -58,6 +58,15 @@
 						"storeSettings": {
 							"type": "AzureBlobFSReadSettings",
 							"recursive": true,
+							"modifiedDatetimeStart": {
+								"value": "@pipeline().parameters.windowStart",
+								"type": "Expression"
+							},
+							"modifiedDatetimeEnd": {
+								"value": "@pipeline().parameters.windowEnd",
+								"type": "Expression"
+							},
+							"wildcardFileName": "*.json",
 							"enablePartitionDiscovery": false
 						},
 						"formatSettings": {
@@ -154,6 +163,14 @@
 									"name": "PaymentDate",
 									"type": "DateTime"
 								}
+							},
+							{
+								"source": {
+									"path": "$['SystemProperties']"
+								},
+								"sink": {
+									"name": "SystemProperties"
+								}
 							}
 						],
 						"collectionReference": "",
@@ -163,7 +180,17 @@
 				"inputs": [
 					{
 						"referenceName": "ds_src_payments",
-						"type": "DatasetReference"
+						"type": "DatasetReference",
+						"parameters": {
+							"paymentsContainer": {
+								"value": "@activity('Get Params').output.firstRow.PaymentContainer",
+								"type": "Expression"
+							},
+							"paymentsRootFolder": {
+								"value": "@activity('Get Params').output.firstRow.PaymentRootFolder",
+								"type": "Expression"
+							}
+						}
 					}
 				],
 				"outputs": [
