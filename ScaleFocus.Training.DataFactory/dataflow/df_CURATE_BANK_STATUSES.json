@@ -20,6 +20,13 @@
 						"type": "DatasetReference"
 					},
 					"name": "CurBankStatuses"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_ingestion_bankStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "IngBankStatuses2"
 				}
 			],
 			"sinks": [
@@ -28,7 +35,14 @@
 						"referenceName": "ds_curation_bankStatuses",
 						"type": "DatasetReference"
 					},
-					"name": "CurateBankStatuses"
+					"name": "InsertNewBankStatuses"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_curation_bankStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "UpdateBankStatuses"
 				}
 			],
 			"transformations": [
@@ -37,6 +51,12 @@
 				},
 				{
 					"name": "FilterOnlyNewBankStatuses"
+				},
+				{
+					"name": "JoinIngestionAndCuration2"
+				},
+				{
+					"name": "FilterOnlyRecordToUpdate"
 				},
 				{
 					"name": "AlterRow1"
@@ -61,13 +81,44 @@
 				"     validateSchema: false,",
 				"     isolationLevel: 'READ_UNCOMMITTED',",
 				"     format: 'table') ~> CurBankStatuses",
+				"source(output(",
+				"          BankStatusId as integer,",
+				"          BankStatusCode as string,",
+				"          BankStatusName as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> IngBankStatuses2",
 				"IngBankStatuses, CurBankStatuses join(IngBankStatuses@BankStatusCode == CurBankStatuses@BankStatusCode",
 				"     && IngBankStatuses@BankStatusName == CurBankStatuses@BankStatusName,",
 				"     joinType:'left',",
 				"     broadcast: 'auto')~> JoinIngestionAndCuration",
 				"JoinIngestionAndCuration filter(isNull(CurBankStatuses@BankStatusCode)) ~> FilterOnlyNewBankStatuses",
-				"FilterOnlyNewBankStatuses alterRow(insertIf(and(IngBankStatuses@BankStatusCode != CurBankStatuses@BankStatusCode, IngBankStatuses@BankStatusName != CurBankStatuses@BankStatusName)),",
-				"     updateIf(IngBankStatuses@BankStatusName != CurBankStatuses@BankStatusName)) ~> AlterRow1",
+				"IngBankStatuses2, CurBankStatuses join(IngBankStatuses2@BankStatusCode == CurBankStatuses@BankStatusCode,",
+				"     joinType:'left',",
+				"     broadcast: 'auto')~> JoinIngestionAndCuration2",
+				"JoinIngestionAndCuration2 filter(isNull(CurBankStatuses@BankStatusName)) ~> FilterOnlyRecordToUpdate",
+				"FilterOnlyRecordToUpdate alterRow(updateIf(true())) ~> AlterRow1",
+				"FilterOnlyNewBankStatuses sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          BankStatusId as integer,",
+				"          BankStatusCode as string,",
+				"          BankStatusName as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          BankStatusCode = IngBankStatuses@BankStatusCode,",
+				"          BankStatusName = IngBankStatuses@BankStatusName",
+				"     )) ~> InsertNewBankStatuses",
 				"AlterRow1 sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
@@ -77,16 +128,17 @@
 				"     ),",
 				"     deletable:false,",
 				"     insertable:false,",
-				"     updateable:false,",
-				"     upsertable:true,",
+				"     updateable:true,",
+				"     upsertable:false,",
 				"     keys:['BankStatusCode'],",
 				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
 				"     errorHandlingOption: 'stopOnFirstError',",
 				"     mapColumn(",
-				"          BankStatusCode = IngBankStatuses@BankStatusCode,",
-				"          BankStatusName = IngBankStatuses@BankStatusName",
-				"     )) ~> CurateBankStatuses"
+				"          BankStatusCode = IngBankStatuses2@BankStatusCode,",
+				"          BankStatusName = IngBankStatuses2@BankStatusName",
+				"     )) ~> UpdateBankStatuses"
 			]
 		}
 	}
