@@ -45,6 +45,26 @@
 					},
 					"waitOnCompletion": true
 				}
+			},
+			{
+				"name": "Golden Payment Statuses",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Curate Payment Statuses",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_GOLDEN_PAYMENT_STATUSES",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
 			}
 		],
 		"annotations": []
