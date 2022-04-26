@@ -66,8 +66,6 @@
 								"value": "@pipeline().parameters.windowEnd",
 								"type": "Expression"
 							},
-							"wildcardFolderPath": "*",
-							"wildcardFileName": "*.json",
 							"enablePartitionDiscovery": false
 						},
 						"formatSettings": {
@@ -77,7 +75,7 @@
 					"sink": {
 						"type": "AzureSqlSink",
 						"writeBehavior": "insert",
-						"sqlWriterUseTableLock": false,
+						"sqlWriterUseTableLock": true,
 						"disableMetricsCollection": false
 					},
 					"enableStaging": false,
@@ -100,17 +98,7 @@
 				"inputs": [
 					{
 						"referenceName": "ds_src_payments",
-						"type": "DatasetReference",
-						"parameters": {
-							"paymentsContainer": {
-								"value": "@activity('Get Params').output.firstRow.PaymentContainer",
-								"type": "Expression"
-							},
-							"paymentsRootFolder": {
-								"value": "@activity('Get Params').output.firstRow.PaymentRootFolder",
-								"type": "Expression"
-							}
-						}
+						"type": "DatasetReference"
 					}
 				],
 				"outputs": [
