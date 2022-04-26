@@ -99,72 +99,9 @@
 									"name": "Properties",
 									"type": "String"
 								}
-							},
-							{
-								"source": {
-									"path": "$['Body']['payment_identifier']"
-								},
-								"sink": {
-									"name": "PaymentIdentifier",
-									"type": "String"
-								}
-							},
-							{
-								"source": {
-									"path": "$['Body']['unique_customer_number']"
-								},
-								"sink": {
-									"name": "UniqueCustomerNumber",
-									"type": "String"
-								}
-							},
-							{
-								"source": {
-									"path": "$['Body']['bank_status_code']"
-								},
-								"sink": {
-									"name": "BankStatusCode",
-									"type": "String"
-								}
-							},
-							{
-								"source": {
-									"path": "$['Body']['payment_status_name']"
-								},
-								"sink": {
-									"name": "PaymentStatusName",
-									"type": "String"
-								}
-							},
-							{
-								"source": {
-									"path": "$['Body']['payment_amount']"
-								},
-								"sink": {
-									"name": "PaymentAmount",
-									"type": "Decimal"
-								}
-							},
-							{
-								"source": {
-									"path": "$['Body']['deduction']"
-								},
-								"sink": {
-									"name": "Deduction",
-									"type": "Decimal"
-								}
-							},
-							{
-								"source": {
-									"path": "$['Body']['payment_date']"
-								},
-								"sink": {
-									"name": "PaymentDate",
-									"type": "DateTime"
-								}
 							}
 						],
-						"mapComplexValuesToString": false
+						"mapComplexValuesToString": true
 					}
 				},
 				"inputs": [
@@ -176,11 +113,7 @@
 				"outputs": [
 					{
 						"referenceName": "ds_ingestion_payments",
-						"type": "DatasetReference",
-						"parameters": {
-							"schemaName": "am",
-							"tableName": "Payments"
-						}
+						"type": "DatasetReference"
 					}
 				]
 			}
