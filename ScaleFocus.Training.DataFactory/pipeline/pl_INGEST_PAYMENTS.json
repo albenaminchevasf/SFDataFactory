@@ -58,14 +58,6 @@
 						"storeSettings": {
 							"type": "AzureBlobFSReadSettings",
 							"recursive": true,
-							"modifiedDatetimeStart": {
-								"value": "@pipeline().parameters.windowStart",
-								"type": "Expression"
-							},
-							"modifiedDatetimeEnd": {
-								"value": "@pipeline().parameters.windowEnd",
-								"type": "Expression"
-							},
 							"enablePartitionDiscovery": false
 						},
 						"formatSettings": {
@@ -99,8 +91,72 @@
 									"name": "Properties",
 									"type": "String"
 								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['payment_identifier']"
+								},
+								"sink": {
+									"name": "PaymentIdentifier",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['unique_customer_number']"
+								},
+								"sink": {
+									"name": "UniqueCustomerNumber",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['bank_status_code']"
+								},
+								"sink": {
+									"name": "BankStatusCode",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['payment_status_name']"
+								},
+								"sink": {
+									"name": "PaymentStatusName",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['payment_amount']"
+								},
+								"sink": {
+									"name": "PaymentAmount",
+									"type": "Decimal"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['deduction']"
+								},
+								"sink": {
+									"name": "Deduction",
+									"type": "Decimal"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['payment_date']"
+								},
+								"sink": {
+									"name": "PaymentDate",
+									"type": "DateTime"
+								}
 							}
 						],
+						"collectionReference": "",
 						"mapComplexValuesToString": true
 					}
 				},
@@ -113,7 +169,17 @@
 				"outputs": [
 					{
 						"referenceName": "ds_ingestion_payments",
-						"type": "DatasetReference"
+						"type": "DatasetReference",
+						"parameters": {
+							"schemaName": {
+								"value": "@activity('Get Params').output.firstRow.SchemaName",
+								"type": "Expression"
+							},
+							"tableName": {
+								"value": "@activity('Get Params').output.firstRow.IngestionTableName",
+								"type": "Expression"
+							}
+						}
 					}
 				]
 			}
