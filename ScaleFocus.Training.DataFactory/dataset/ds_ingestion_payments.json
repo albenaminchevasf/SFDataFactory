@@ -71,6 +71,12 @@
 			{
 				"name": "SystemProperties",
 				"type": "nvarchar"
+			},
+			{
+				"name": "CreatedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
 			}
 		],
 		"typeProperties": {
