@@ -1,0 +1,73 @@
+{
+	"name": "ds_ingestion_payments",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sftraining_ingestion_db",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "ingestion"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "PaymentId",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "PaymentIdentifier",
+				"type": "nvarchar"
+			},
+			{
+				"name": "UniqueCustomerNumber",
+				"type": "nvarchar"
+			},
+			{
+				"name": "BankStatusCode",
+				"type": "nvarchar"
+			},
+			{
+				"name": "PaymentStatusName",
+				"type": "nvarchar"
+			},
+			{
+				"name": "PaymentAmount",
+				"type": "decimal",
+				"precision": 18,
+				"scale": 2
+			},
+			{
+				"name": "Deduction",
+				"type": "decimal",
+				"precision": 18,
+				"scale": 2
+			},
+			{
+				"name": "PaymentDate",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "EnqueuedTimeUtc",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "Properties",
+				"type": "nvarchar"
+			},
+			{
+				"name": "SystemProperties",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "am",
+			"table": "Payments"
+		}
+	}
+}
