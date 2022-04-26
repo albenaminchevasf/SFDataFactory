@@ -5,6 +5,14 @@
 			"referenceName": "ls_sftraining_datalake",
 			"type": "LinkedServiceReference"
 		},
+		"parameters": {
+			"paymentsContainer": {
+				"type": "string"
+			},
+			"paymentsRootFolder": {
+				"type": "string"
+			}
+		},
 		"folder": {
 			"name": "src"
 		},
@@ -13,8 +21,14 @@
 		"typeProperties": {
 			"location": {
 				"type": "AzureBlobFSLocation",
-				"folderPath": "payments/raw",
-				"fileSystem": "payments"
+				"folderPath": {
+					"value": "@dataset().paymentsRootFolder",
+					"type": "Expression"
+				},
+				"fileSystem": {
+					"value": "@dataset().paymentsContainer",
+					"type": "Expression"
+				}
 			}
 		},
 		"schema": {}
