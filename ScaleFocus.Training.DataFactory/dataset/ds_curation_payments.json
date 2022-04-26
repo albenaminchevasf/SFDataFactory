@@ -39,6 +39,12 @@
 				"scale": 2
 			},
 			{
+				"name": "Deduction",
+				"type": "decimal",
+				"precision": 18,
+				"scale": 2
+			},
+			{
 				"name": "PaymentDate",
 				"type": "datetime",
 				"precision": 23,
