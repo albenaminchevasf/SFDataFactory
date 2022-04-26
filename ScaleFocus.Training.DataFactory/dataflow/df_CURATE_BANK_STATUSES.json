@@ -81,7 +81,11 @@
 				"     keys:['BankStatusCode'],",
 				"     format: 'table',",
 				"     skipDuplicateMapOutputs: true,",
-				"     errorHandlingOption: 'stopOnFirstError') ~> CurateBankStatuses"
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          BankStatusCode = IngBankStatuses@BankStatusCode,",
+				"          BankStatusName = IngBankStatuses@BankStatusName",
+				"     )) ~> CurateBankStatuses"
 			]
 		}
 	}
