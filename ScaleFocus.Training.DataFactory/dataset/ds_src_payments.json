@@ -21,14 +21,9 @@
 		"typeProperties": {
 			"location": {
 				"type": "AzureBlobFSLocation",
-				"folderPath": {
-					"value": "@dataset().paymentsRootFolder",
-					"type": "Expression"
-				},
-				"fileSystem": {
-					"value": "@dataset().paymentsContainer",
-					"type": "Expression"
-				}
+				"fileName": "01.json",
+				"folderPath": "payments/raw/00/2022/04/26/00",
+				"fileSystem": "payments"
 			}
 		},
 		"schema": {}
