@@ -47,9 +47,6 @@
 			],
 			"transformations": [
 				{
-					"name": "FilterOnlyActiveRecords"
-				},
-				{
 					"name": "JoinIngestionAndCuration"
 				},
 				{
@@ -124,9 +121,9 @@
 				"     allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     isolationLevel: 'READ_UNCOMMITTED',",
-				"     format: 'table') ~> CurCustomers",
-				"CurCustomers filter(IsActive) ~> FilterOnlyActiveRecords",
-				"FilterNullValues, FilterOnlyActiveRecords join(IngCustomers@UniqueCustomerNumber == CurCustomers@UniqueCustomerNumber,",
+				"     query: 'select * from am.CustomerDim where IsActive=1',",
+				"     format: 'query') ~> CurCustomers",
+				"FilterNullValues, CurCustomers join(IngCustomers@UniqueCustomerNumber == CurCustomers@UniqueCustomerNumber,",
 				"     joinType:'left',",
 				"     broadcast: 'auto')~> JoinIngestionAndCuration",
 				"RenameColumns split(isNull(CUR_UniqueCustomerNumber),",
@@ -163,7 +160,7 @@
 				"          CUR_IsActive = 1) ~> AddColumns",
 				"IngCustomers filter(!isNull(UniqueCustomerNumber)) ~> FilterNullValues",
 				"SelectCurComparableColumns derive(CUR_signature = sha2(256,columns())) ~> AddCurRowSignature",
-				"FilterOnlyActiveRecords select(mapColumn(",
+				"CurCustomers select(mapColumn(",
 				"          UniqueCustomerNumber,",
 				"          CustomerName,",
 				"          Phone,",
@@ -185,11 +182,12 @@
 				"          ING_BillingCity,",
 				"          ING_BillingPostalCode,",
 				"          ING_BillingState,",
-				"          ING_BillingCountryName",
+				"          ING_BillingCountryName,",
+				"          CUR_CustomerDimId",
 				"     ),",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true) ~> SelectIngComparableColumns",
-				"SelectIngComparableColumns derive(ING_signature = sha2(256, columns())) ~> AddIngRowSignature",
+				"SelectIngComparableColumns derive(ING_signature = sha2(256, ING_UniqueCustomerNumber,ING_CustomerName,ING_Phone,ING_Email,ING_BillingAddress,ING_BillingCity,ING_BillingPostalCode,ING_BillingState,ING_BillingCountryName)) ~> AddIngRowSignature",
 				"AddIngRowSignature, AddCurRowSignature exists(ING_signature == CUR_signature,",
 				"     negate:true,",
 				"     broadcast: 'auto')~> CompareSignatures",
@@ -298,15 +296,15 @@
 				"     insertable:false,",
 				"     updateable:true,",
 				"     upsertable:false,",
-				"     keys:['UniqueCustomerNumber'],",
+				"     keys:['CustomerDimId'],",
 				"     format: 'table',",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
 				"     errorHandlingOption: 'stopOnFirstError',",
 				"     mapColumn(",
+				"          CustomerDimId = CUR_CustomerDimId,",
 				"          ValidTo = CUR_ValidTo,",
-				"          IsActive,",
-				"          UniqueCustomerNumber = ING_UniqueCustomerNumber",
+				"          IsActive",
 				"     )) ~> UpdateValidToAndFlag"
 			]
 		}
