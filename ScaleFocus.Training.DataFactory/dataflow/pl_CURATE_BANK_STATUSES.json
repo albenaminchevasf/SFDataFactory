@@ -1,0 +1,87 @@
+{
+	"name": "pl_CURATE_BANK_STATUSES",
+	"properties": {
+		"folder": {
+			"name": "curation"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "ds_ingestion_bankStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "IngBankStatuses"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_curation_bankStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "CurBankStatuses"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "ds_curation_bankStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "CurateBankStatuses"
+				}
+			],
+			"transformations": [
+				{
+					"name": "JoinIngestionAndCuration"
+				},
+				{
+					"name": "FilterOnlyNewBankStatuses"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          BankStatusId as integer,",
+				"          BankStatusCode as string,",
+				"          BankStatusName as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> IngBankStatuses",
+				"source(output(",
+				"          BankStatusId as integer,",
+				"          BankStatusCode as string,",
+				"          BankStatusName as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> CurBankStatuses",
+				"IngBankStatuses, CurBankStatuses join(IngBankStatuses@BankStatusCode == CurBankStatuses@BankStatusCode,",
+				"     joinType:'left',",
+				"     broadcast: 'auto')~> JoinIngestionAndCuration",
+				"JoinIngestionAndCuration filter(isNull(CurBankStatuses@BankStatusCode)) ~> FilterOnlyNewBankStatuses",
+				"FilterOnlyNewBankStatuses sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          BankStatusId as integer,",
+				"          BankStatusCode as string,",
+				"          BankStatusName as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          BankStatusCode = IngBankStatuses@BankStatusCode,",
+				"          BankStatusName = IngBankStatuses@BankStatusName",
+				"     )) ~> CurateBankStatuses"
+			]
+		}
+	}
+}
