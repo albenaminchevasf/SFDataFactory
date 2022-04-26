@@ -17,6 +17,15 @@
 				"typeProperties": {
 					"source": {
 						"type": "AzureSqlSource",
+						"additionalColumns": [
+							{
+								"name": "LastPipelineRun",
+								"value": {
+									"value": "@utcnow()",
+									"type": "Expression"
+								}
+							}
+						],
 						"queryTimeout": "02:00:00",
 						"partitionOption": "None"
 					},
@@ -190,6 +199,16 @@
 									"name": "IsActive",
 									"type": "Boolean",
 									"physicalType": "bit"
+								}
+							},
+							{
+								"source": {
+									"name": "LastPipelineRun"
+								},
+								"sink": {
+									"name": "LastPipelineRun",
+									"type": "DateTime",
+									"physicalType": "datetime"
 								}
 							}
 						],
