@@ -37,6 +37,9 @@
 				},
 				{
 					"name": "FilterOnlyNewBankStatuses"
+				},
+				{
+					"name": "AlterRow1"
 				}
 			],
 			"scriptLines": [
@@ -62,7 +65,8 @@
 				"     joinType:'left',",
 				"     broadcast: 'auto')~> JoinIngestionAndCuration",
 				"JoinIngestionAndCuration filter(isNull(CurBankStatuses@BankStatusCode)) ~> FilterOnlyNewBankStatuses",
-				"FilterOnlyNewBankStatuses sink(allowSchemaDrift: true,",
+				"FilterOnlyNewBankStatuses alterRow(upsertIf(IngBankStatuses@BankStatusName != CurBankStatuses@BankStatusName)) ~> AlterRow1",
+				"AlterRow1 sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
 				"          BankStatusId as integer,",
@@ -72,7 +76,7 @@
 				"     deletable:false,",
 				"     insertable:true,",
 				"     updateable:false,",
-				"     upsertable:false,",
+				"     upsertable:true,",
 				"     format: 'table',",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
