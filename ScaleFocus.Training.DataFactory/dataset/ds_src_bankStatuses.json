@@ -1,0 +1,33 @@
+{
+	"name": "ds_src_bankStatuses",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sftraining_datalake",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": "BankStatuses.csv",
+				"folderPath": "bankstatuses/raw",
+				"fileSystem": "dimensions"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": [
+			{
+				"name": "BankStatusCode",
+				"type": "String"
+			},
+			{
+				"name": "BankStatusName",
+				"type": "String"
+			}
+		]
+	}
+}
