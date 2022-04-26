@@ -1,0 +1,65 @@
+{
+	"name": "ds_curation_payments",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sftraining_curation_db",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "curation"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "PaymentId",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "PaymentIdentifier",
+				"type": "nvarchar"
+			},
+			{
+				"name": "UniqueCustomerNumber",
+				"type": "nvarchar"
+			},
+			{
+				"name": "BankStatusId",
+				"type": "nvarchar"
+			},
+			{
+				"name": "PaymentStatusId",
+				"type": "nvarchar"
+			},
+			{
+				"name": "PaymentAmount",
+				"type": "decimal",
+				"precision": 18,
+				"scale": 2
+			},
+			{
+				"name": "PaymentDate",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "CreatedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "ModifiedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			}
+		],
+		"typeProperties": {
+			"schema": "am",
+			"table": "Payments"
+		}
+	}
+}
