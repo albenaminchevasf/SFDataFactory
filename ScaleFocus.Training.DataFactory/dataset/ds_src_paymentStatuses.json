@@ -11,7 +11,7 @@
 			"location": {
 				"type": "AzureBlobFSLocation",
 				"fileName": "PaymentStatuses.csv",
-				"folderPath": "paymentstatuses",
+				"folderPath": "paymentstatuses/raw",
 				"fileSystem": "dimensions"
 			},
 			"columnDelimiter": ",",
