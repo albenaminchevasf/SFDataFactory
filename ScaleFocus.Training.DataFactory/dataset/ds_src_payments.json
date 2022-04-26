@@ -13,8 +13,7 @@
 		"typeProperties": {
 			"location": {
 				"type": "AzureBlobFSLocation",
-				"fileName": "01.json",
-				"folderPath": "payments/raw/00/2022/04/26/00",
+				"folderPath": "payments/raw",
 				"fileSystem": "payments"
 			}
 		},
