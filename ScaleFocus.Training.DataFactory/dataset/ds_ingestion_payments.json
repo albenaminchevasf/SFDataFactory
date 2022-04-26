@@ -5,14 +5,6 @@
 			"referenceName": "ls_sftraining_ingestion_db",
 			"type": "LinkedServiceReference"
 		},
-		"parameters": {
-			"schemaName": {
-				"type": "string"
-			},
-			"tableName": {
-				"type": "string"
-			}
-		},
 		"folder": {
 			"name": "ingestion"
 		},
@@ -74,14 +66,8 @@
 			}
 		],
 		"typeProperties": {
-			"schema": {
-				"value": "@dataset().schemaName",
-				"type": "Expression"
-			},
-			"table": {
-				"value": "@dataset().tableName",
-				"type": "Expression"
-			}
+			"schema": "am",
+			"table": "Payments"
 		}
 	}
 }
