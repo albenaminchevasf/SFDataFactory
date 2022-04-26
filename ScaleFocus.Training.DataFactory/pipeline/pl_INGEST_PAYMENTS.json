@@ -30,10 +30,98 @@
 						"referenceName": "ds_payments_params",
 						"type": "DatasetReference"
 					},
-					"firstRowOnly": false
+					"firstRowOnly": true
 				}
+			},
+			{
+				"name": "Ingest Payments",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Get Params",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"modifiedDatetimeStart": {
+								"value": "@pipeline().parameters.windowStart",
+								"type": "Expression"
+							},
+							"modifiedDatetimeEnd": {
+								"value": "@pipeline().parameters.windowEnd",
+								"type": "Expression"
+							},
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": true,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_src_payments",
+						"type": "DatasetReference",
+						"parameters": {
+							"paymentsContainer": {
+								"value": "@activity('Get Params').output.firstRow.PaymentContainer",
+								"type": "Expression"
+							},
+							"paymentsRootFolder": {
+								"value": "@activity('Get Params').output.firstRow.PaymentRootFolder",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_ingestion_payments",
+						"type": "DatasetReference",
+						"parameters": {
+							"schemaName": {
+								"value": "@activity('Get Params').output.firstRow.SchemaName",
+								"type": "Expression"
+							},
+							"tableName": {
+								"value": "@activity('Get Params').output.firstRow.IngestionTableName",
+								"type": "Expression"
+							}
+						}
+					}
+				]
 			}
 		],
+		"parameters": {
+			"windowStart": {
+				"type": "string"
+			},
+			"windowEnd": {
+				"type": "string"
+			}
+		},
 		"annotations": []
 	}
 }
