@@ -1,0 +1,2501 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-sftraining"
+		},
+		"load_payments_every_5min_properties_pipeline_parameters_windowStart": {
+			"type": "string",
+			"defaultValue": "@trigger().outputs.windowStartTime"
+		},
+		"load_payments_every_5min_properties_pipeline_parameters_windowEnd": {
+			"type": "string",
+			"defaultValue": "@trigger().outputs.windowEndTime"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_src_paymentStatuses')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_sftraining_datalake",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "src"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "PaymentStatuses.csv",
+						"folderPath": "paymentstatuses/raw",
+						"fileSystem": "dimensions"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": [
+					{
+						"name": "PaymentStatus",
+						"type": "String"
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_src_payments')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_sftraining_datalake",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"paymentsContainer": {
+						"type": "string"
+					},
+					"paymentsRootFolder": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "src"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": {
+							"value": "@dataset().paymentsRootFolder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().paymentsContainer",
+							"type": "Expression"
+						}
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_CURATE_PAYMENTS')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get Last Modified Date",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "  SELECT CASE WHEN MAX(CreatedOn) IS NULL THEN '1900-01-01' \n  ELSE MAX(CreatedOn) END as CreatedOn from [am].[Payments]",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "ds_curation_payments",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						}
+					},
+					{
+						"name": "Curate Payments",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Get Last Modified Date",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT *\n  FROM am.Payments\nWHERE 1=1\nAND CreatedOn > '@{activity('Get Last Modified Date').output.firstRow.CreatedOn}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"PaymentIdentifier"
+									]
+								},
+								"sqlWriterUseTableLock": true,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "PaymentId",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "PaymentId",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "PaymentIdentifier",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "PaymentIdentifier",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "UniqueCustomerNumber",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "UniqueCustomerNumber",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BankStatusCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "BankStatusCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "PaymentStatusName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "PaymentStatusName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "PaymentAmount",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 18
+										},
+										"sink": {
+											"name": "PaymentAmount",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 18
+										}
+									},
+									{
+										"source": {
+											"name": "Deduction",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 18
+										},
+										"sink": {
+											"name": "Deduction",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 18
+										}
+									},
+									{
+										"source": {
+											"name": "PaymentDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "PaymentDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "CreatedOn",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "CreatedOn",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_ingestion_payments",
+								"type": "DatasetReference",
+								"parameters": {
+									"schemaName": "am",
+									"tableName": "Payments"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_curation_payments",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_GOLDEN_BANK_STATUSES')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Golden Bank Statuses",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"BankStatusId"
+									]
+								},
+								"sqlWriterUseTableLock": true,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "BankStatusId",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "BankStatusId",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "BankStatusCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "BankStatusCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BankStatusName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "BankStatusName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_curation_bankStatuses",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_golden_bank_statuses",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_GOLDEN_CUSTOMERS')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Golden Customers",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"additionalColumns": [
+									{
+										"name": "LastPipelineRun",
+										"value": {
+											"value": "@utcnow()",
+											"type": "Expression"
+										}
+									}
+								],
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"CustomerDimId"
+									]
+								},
+								"sqlWriterUseTableLock": true,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "CustomerDimId",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "CustomerDimId",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "UniqueCustomerNumber",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "UniqueCustomerNumber",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CustomerName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "CustomerName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Phone",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "Phone",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Email",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "Email",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BillingAddress",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "BillingAddress",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BillingCity",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "BillingCity",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BillingPostalCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "BillingPostalCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BillingState",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "BillingState",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BillingCountryName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "BillingCountryName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ValidFrom",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "ValidFrom",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "ValidTo",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "ValidTo",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "IsActive",
+											"type": "Boolean",
+											"physicalType": "bit"
+										},
+										"sink": {
+											"name": "IsActive",
+											"type": "Boolean",
+											"physicalType": "bit"
+										}
+									},
+									{
+										"source": {
+											"name": "LastPipelineRun"
+										},
+										"sink": {
+											"name": "LastPipelineRun",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_curation_customers",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_golden_customers",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_GOLDEN_PAYMENT_STATUSES')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Golden payment statuses",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"PaymentStatusId"
+									]
+								},
+								"sqlWriterUseTableLock": true,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "PaymentStatusId",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "PaymentStatusId",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "PaymentStatusName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "PaymentStatusName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_curation_paymentStatuses",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_golden_payment_statuses",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_INGEST_BANK_STATUSES')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Ingest Bank Statuses",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "truncate table am.BankStatuses",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": true,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "BankStatusCode",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "BankStatusCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BankStatusName",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "BankStatusName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_src_bankStatuses",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_ingestion_bankStatuses",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_INGEST_CUSTOMERS')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Ingest Customers",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "ExcelSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "truncate table am.CustomerDim",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": true,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "UniqueCustomerNumber",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "UniqueCustomerNumber",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CustomerName",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "CustomerName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Phone",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "Phone",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Email",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "Email",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BillingAddress",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "BillingAddress",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BillingCity",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "BillingCity",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BillingPostalCode",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "BillingPostalCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BillingState",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "BillingState",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BillingCountryName",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "BillingCountryName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_src_customers",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_ingestion_customers",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_INGEST_PAYMENTS')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get Params",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "ds_payments_params",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": true
+						}
+					},
+					{
+						"name": "Ingest Payments",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Get Params",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "CreatedOn",
+										"value": {
+											"value": "@utcnow()",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"modifiedDatetimeStart": {
+										"value": "@pipeline().parameters.windowStart",
+										"type": "Expression"
+									},
+									"modifiedDatetimeEnd": {
+										"value": "@pipeline().parameters.windowEnd",
+										"type": "Expression"
+									},
+									"wildcardFileName": "*.json",
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": true,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['EnqueuedTimeUtc']"
+										},
+										"sink": {
+											"name": "EnqueuedTimeUtc",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['Properties']"
+										},
+										"sink": {
+											"name": "Properties",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['Body']['payment_identifier']"
+										},
+										"sink": {
+											"name": "PaymentIdentifier",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['Body']['unique_customer_number']"
+										},
+										"sink": {
+											"name": "UniqueCustomerNumber",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['Body']['bank_status_code']"
+										},
+										"sink": {
+											"name": "BankStatusCode",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['Body']['payment_status_name']"
+										},
+										"sink": {
+											"name": "PaymentStatusName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['Body']['payment_amount']"
+										},
+										"sink": {
+											"name": "PaymentAmount",
+											"type": "Decimal"
+										}
+									},
+									{
+										"source": {
+											"path": "$['Body']['deduction']"
+										},
+										"sink": {
+											"name": "Deduction",
+											"type": "Decimal"
+										}
+									},
+									{
+										"source": {
+											"path": "$['Body']['payment_date']"
+										},
+										"sink": {
+											"name": "PaymentDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SystemProperties']"
+										},
+										"sink": {
+											"name": "SystemProperties"
+										}
+									},
+									{
+										"source": {
+											"path": "$['CreatedOn']"
+										},
+										"sink": {
+											"name": "CreatedOn"
+										}
+									}
+								],
+								"collectionReference": "",
+								"mapComplexValuesToString": true
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_src_payments",
+								"type": "DatasetReference",
+								"parameters": {
+									"paymentsContainer": {
+										"value": "@activity('Get Params').output.firstRow.PaymentContainer",
+										"type": "Expression"
+									},
+									"paymentsRootFolder": {
+										"value": "@activity('Get Params').output.firstRow.PaymentRootFolder",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_ingestion_payments",
+								"type": "DatasetReference",
+								"parameters": {
+									"schemaName": {
+										"value": "@activity('Get Params').output.firstRow.SchemaName",
+										"type": "Expression"
+									},
+									"tableName": {
+										"value": "@activity('Get Params').output.firstRow.IngestionTableName",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"windowStart": {
+						"type": "string"
+					},
+					"windowEnd": {
+						"type": "string"
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_src_payments')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_INGEST_PAYMENT_STATUSES')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Ingest Payment Statuses",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "truncate table am.PaymentStatuses",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": true,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "PaymentStatus",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "PaymentStatusName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_src_paymentStatuses",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_ingestion_paymentStatuses",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_src_paymentStatuses')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/df_CURATE_BANK_STATUSES')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"folder": {
+					"name": "curation"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "ds_ingestion_bankStatuses",
+								"type": "DatasetReference"
+							},
+							"name": "IngBankStatuses"
+						},
+						{
+							"dataset": {
+								"referenceName": "ds_curation_bankStatuses",
+								"type": "DatasetReference"
+							},
+							"name": "CurBankStatuses"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "ds_curation_bankStatuses",
+								"type": "DatasetReference"
+							},
+							"name": "InsertNewBankStatuses"
+						},
+						{
+							"dataset": {
+								"referenceName": "ds_curation_bankStatuses",
+								"type": "DatasetReference"
+							},
+							"name": "UpdateBankStatuses"
+						}
+					],
+					"transformations": [
+						{
+							"name": "JoinIngestionAndCuration"
+						},
+						{
+							"name": "split1"
+						},
+						{
+							"name": "RenameColumnsWithSchema"
+						},
+						{
+							"name": "UpdateRecords"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          BankStatusId as integer,",
+						"          BankStatusCode as string,",
+						"          BankStatusName as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> IngBankStatuses",
+						"source(output(",
+						"          BankStatusId as integer,",
+						"          BankStatusCode as string,",
+						"          BankStatusName as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> CurBankStatuses",
+						"IngBankStatuses, CurBankStatuses join(IngBankStatuses@BankStatusCode == CurBankStatuses@BankStatusCode,",
+						"     joinType:'left',",
+						"     broadcast: 'auto')~> JoinIngestionAndCuration",
+						"RenameColumnsWithSchema split(isNull(CUR_BankStatusCode),",
+						"     and(ING_BankStatusCode == CUR_BankStatusCode, ING_BankStatusName != CUR_BankStatusName),",
+						"     disjoint: false) ~> split1@(newRecords, updatedRecords, notChanged)",
+						"JoinIngestionAndCuration select(mapColumn(",
+						"          ING_BankStatusId = IngBankStatuses@BankStatusId,",
+						"          ING_BankStatusCode = IngBankStatuses@BankStatusCode,",
+						"          ING_BankStatusName = IngBankStatuses@BankStatusName,",
+						"          CUR_BankStatusId = CurBankStatuses@BankStatusId,",
+						"          CUR_BankStatusCode = CurBankStatuses@BankStatusCode,",
+						"          CUR_BankStatusName = CurBankStatuses@BankStatusName",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> RenameColumnsWithSchema",
+						"split1@updatedRecords alterRow(updateIf(true())) ~> UpdateRecords",
+						"split1@newRecords sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          BankStatusId as integer,",
+						"          BankStatusCode as string,",
+						"          BankStatusName as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          BankStatusCode = ING_BankStatusCode,",
+						"          BankStatusName = ING_BankStatusName",
+						"     )) ~> InsertNewBankStatuses",
+						"UpdateRecords sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          BankStatusId as integer,",
+						"          BankStatusCode as string,",
+						"          BankStatusName as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:false,",
+						"     updateable:true,",
+						"     upsertable:false,",
+						"     keys:['BankStatusCode'],",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          BankStatusCode = ING_BankStatusCode,",
+						"          BankStatusName = ING_BankStatusName",
+						"     )) ~> UpdateBankStatuses"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/df_CURATE_CUSTOMERS')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"folder": {
+					"name": "curation"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "ds_ingestion_customers",
+								"type": "DatasetReference"
+							},
+							"name": "IngCustomers"
+						},
+						{
+							"dataset": {
+								"referenceName": "ds_curation_customers",
+								"type": "DatasetReference"
+							},
+							"name": "CurCustomers"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "ds_curation_customers",
+								"type": "DatasetReference"
+							},
+							"name": "AddNewRecords"
+						},
+						{
+							"dataset": {
+								"referenceName": "ds_curation_customers",
+								"type": "DatasetReference"
+							},
+							"name": "InsertUpdatedRecords"
+						},
+						{
+							"dataset": {
+								"referenceName": "ds_curation_customers",
+								"type": "DatasetReference"
+							},
+							"name": "UpdateValidToAndFlag"
+						}
+					],
+					"transformations": [
+						{
+							"name": "JoinIngestionAndCuration"
+						},
+						{
+							"name": "SplitNewRecords"
+						},
+						{
+							"name": "RenameColumns"
+						},
+						{
+							"name": "AddColumns"
+						},
+						{
+							"name": "FilterNullValues"
+						},
+						{
+							"name": "AddCurRowSignature"
+						},
+						{
+							"name": "SelectCurComparableColumns"
+						},
+						{
+							"name": "SelectIngComparableColumns"
+						},
+						{
+							"name": "AddIngRowSignature"
+						},
+						{
+							"name": "CompareSignatures"
+						},
+						{
+							"name": "UpdateOldRecords"
+						},
+						{
+							"name": "AddColumns2"
+						},
+						{
+							"name": "AddValidToAndFlagColumns"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          CustomerDimId as integer,",
+						"          UniqueCustomerNumber as string,",
+						"          CustomerName as string,",
+						"          Phone as string,",
+						"          Email as string,",
+						"          BillingAddress as string,",
+						"          BillingCity as string,",
+						"          BillingPostalCode as string,",
+						"          BillingState as string,",
+						"          BillingCountryName as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> IngCustomers",
+						"source(output(",
+						"          CustomerDimId as integer,",
+						"          UniqueCustomerNumber as string,",
+						"          CustomerName as string,",
+						"          Phone as string,",
+						"          Email as string,",
+						"          BillingAddress as string,",
+						"          BillingCity as string,",
+						"          BillingPostalCode as string,",
+						"          BillingState as string,",
+						"          BillingCountryName as string,",
+						"          ValidFrom as timestamp,",
+						"          ValidTo as timestamp,",
+						"          IsActive as boolean",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: 'select * from am.CustomerDim where IsActive=1',",
+						"     format: 'query') ~> CurCustomers",
+						"FilterNullValues, CurCustomers join(IngCustomers@UniqueCustomerNumber == CurCustomers@UniqueCustomerNumber,",
+						"     joinType:'left',",
+						"     broadcast: 'auto')~> JoinIngestionAndCuration",
+						"RenameColumns split(isNull(CUR_UniqueCustomerNumber),",
+						"     disjoint: false) ~> SplitNewRecords@(newCustomers, existingCustomers)",
+						"JoinIngestionAndCuration select(mapColumn(",
+						"          ING_CustomerDimId = IngCustomers@CustomerDimId,",
+						"          ING_UniqueCustomerNumber = IngCustomers@UniqueCustomerNumber,",
+						"          ING_CustomerName = IngCustomers@CustomerName,",
+						"          ING_Phone = IngCustomers@Phone,",
+						"          ING_Email = IngCustomers@Email,",
+						"          ING_BillingAddress = IngCustomers@BillingAddress,",
+						"          ING_BillingCity = IngCustomers@BillingCity,",
+						"          ING_BillingPostalCode = IngCustomers@BillingPostalCode,",
+						"          ING_BillingState = IngCustomers@BillingState,",
+						"          ING_BillingCountryName = IngCustomers@BillingCountryName,",
+						"          CUR_CustomerDimId = CurCustomers@CustomerDimId,",
+						"          CUR_UniqueCustomerNumber = CurCustomers@UniqueCustomerNumber,",
+						"          CUR_CustomerName = CurCustomers@CustomerName,",
+						"          CUR_Phone = CurCustomers@Phone,",
+						"          CUR_Email = CurCustomers@Email,",
+						"          CUR_BillingAddress = CurCustomers@BillingAddress,",
+						"          CUR_BillingCity = CurCustomers@BillingCity,",
+						"          CUR_BillingPostalCode = CurCustomers@BillingPostalCode,",
+						"          CUR_BillingState = CurCustomers@BillingState,",
+						"          CUR_BillingCountryName = CurCustomers@BillingCountryName,",
+						"          CUR_ValidFrom = ValidFrom,",
+						"          CUR_ValidTo = ValidTo,",
+						"          CUR_IsActive = IsActive",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> RenameColumns",
+						"SplitNewRecords@newCustomers derive(CUR_ValidFrom = currentUTC(),",
+						"          CUR_ValidTo = toTimestamp('9999-12-31 00:00:00'),",
+						"          CUR_IsActive = 1) ~> AddColumns",
+						"IngCustomers filter(!isNull(UniqueCustomerNumber)) ~> FilterNullValues",
+						"SelectCurComparableColumns derive(CUR_signature = sha2(256,columns())) ~> AddCurRowSignature",
+						"CurCustomers select(mapColumn(",
+						"          UniqueCustomerNumber,",
+						"          CustomerName,",
+						"          Phone,",
+						"          Email,",
+						"          BillingAddress,",
+						"          BillingCity,",
+						"          BillingPostalCode,",
+						"          BillingState,",
+						"          BillingCountryName",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> SelectCurComparableColumns",
+						"SplitNewRecords@existingCustomers select(mapColumn(",
+						"          ING_UniqueCustomerNumber,",
+						"          ING_CustomerName,",
+						"          ING_Phone,",
+						"          ING_Email,",
+						"          ING_BillingAddress,",
+						"          ING_BillingCity,",
+						"          ING_BillingPostalCode,",
+						"          ING_BillingState,",
+						"          ING_BillingCountryName,",
+						"          CUR_CustomerDimId",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> SelectIngComparableColumns",
+						"SelectIngComparableColumns derive(ING_signature = sha2(256, ING_UniqueCustomerNumber,ING_CustomerName,ING_Phone,ING_Email,ING_BillingAddress,ING_BillingCity,ING_BillingPostalCode,ING_BillingState,ING_BillingCountryName)) ~> AddIngRowSignature",
+						"AddIngRowSignature, AddCurRowSignature exists(ING_signature == CUR_signature,",
+						"     negate:true,",
+						"     broadcast: 'auto')~> CompareSignatures",
+						"CompareSignatures alterRow(updateIf(true())) ~> UpdateOldRecords",
+						"CompareSignatures derive(CUR_ValidFrom = currentUTC(),",
+						"          CUR_ValidTo = toTimestamp('9999-12-31 00:00:00'),",
+						"          CUR_IsActive = 1) ~> AddColumns2",
+						"UpdateOldRecords derive(CUR_ValidTo = currentUTC(),",
+						"          IsActive = 0) ~> AddValidToAndFlagColumns",
+						"AddColumns sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          CustomerDimId as integer,",
+						"          UniqueCustomerNumber as string,",
+						"          CustomerName as string,",
+						"          Phone as string,",
+						"          Email as string,",
+						"          BillingAddress as string,",
+						"          BillingCity as string,",
+						"          BillingPostalCode as string,",
+						"          BillingState as string,",
+						"          BillingCountryName as string,",
+						"          ValidFrom as timestamp,",
+						"          ValidTo as timestamp,",
+						"          IsActive as boolean",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          UniqueCustomerNumber = ING_UniqueCustomerNumber,",
+						"          CustomerName = ING_CustomerName,",
+						"          Phone = ING_Phone,",
+						"          Email = ING_Email,",
+						"          BillingAddress = ING_BillingAddress,",
+						"          BillingCity = ING_BillingCity,",
+						"          BillingPostalCode = ING_BillingPostalCode,",
+						"          BillingState = ING_BillingState,",
+						"          BillingCountryName = ING_BillingCountryName,",
+						"          ValidFrom = CUR_ValidFrom,",
+						"          ValidTo = CUR_ValidTo,",
+						"          IsActive = CUR_IsActive",
+						"     )) ~> AddNewRecords",
+						"AddColumns2 sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          CustomerDimId as integer,",
+						"          UniqueCustomerNumber as string,",
+						"          CustomerName as string,",
+						"          Phone as string,",
+						"          Email as string,",
+						"          BillingAddress as string,",
+						"          BillingCity as string,",
+						"          BillingPostalCode as string,",
+						"          BillingState as string,",
+						"          BillingCountryName as string,",
+						"          ValidFrom as timestamp,",
+						"          ValidTo as timestamp,",
+						"          IsActive as boolean",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          UniqueCustomerNumber = ING_UniqueCustomerNumber,",
+						"          CustomerName = ING_CustomerName,",
+						"          Phone = ING_Phone,",
+						"          Email = ING_Email,",
+						"          BillingAddress = ING_BillingAddress,",
+						"          BillingCity = ING_BillingCity,",
+						"          BillingPostalCode = ING_BillingPostalCode,",
+						"          BillingState = ING_BillingState,",
+						"          BillingCountryName = ING_BillingCountryName,",
+						"          ValidFrom = CUR_ValidFrom,",
+						"          ValidTo = CUR_ValidTo,",
+						"          IsActive = CUR_IsActive",
+						"     )) ~> InsertUpdatedRecords",
+						"AddValidToAndFlagColumns sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          CustomerDimId as integer,",
+						"          UniqueCustomerNumber as string,",
+						"          CustomerName as string,",
+						"          Phone as string,",
+						"          Email as string,",
+						"          BillingAddress as string,",
+						"          BillingCity as string,",
+						"          BillingPostalCode as string,",
+						"          BillingState as string,",
+						"          BillingCountryName as string,",
+						"          ValidFrom as timestamp,",
+						"          ValidTo as timestamp,",
+						"          IsActive as boolean",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:false,",
+						"     updateable:true,",
+						"     upsertable:false,",
+						"     keys:['CustomerDimId'],",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          CustomerDimId = CUR_CustomerDimId,",
+						"          ValidTo = CUR_ValidTo,",
+						"          IsActive",
+						"     )) ~> UpdateValidToAndFlag"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/df_CURATE_PAYMENT_STATUSES')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"folder": {
+					"name": "curation"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "ds_ingestion_paymentStatuses",
+								"type": "DatasetReference"
+							},
+							"name": "IngPaymentStatuses"
+						},
+						{
+							"dataset": {
+								"referenceName": "ds_curation_paymentStatuses",
+								"type": "DatasetReference"
+							},
+							"name": "CurPaymentStatuses"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "ds_curation_paymentStatuses",
+								"type": "DatasetReference"
+							},
+							"name": "CurTragetPaymentStatuses"
+						}
+					],
+					"transformations": [
+						{
+							"name": "RecordDoesntExist"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          PaymentStatusId as integer,",
+						"          PaymentStatusName as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> IngPaymentStatuses",
+						"source(output(",
+						"          PaymentStatusId as integer,",
+						"          PaymentStatusName as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> CurPaymentStatuses",
+						"IngPaymentStatuses, CurPaymentStatuses exists(IngPaymentStatuses@PaymentStatusName == CurPaymentStatuses@PaymentStatusName,",
+						"     negate:true,",
+						"     broadcast: 'auto')~> RecordDoesntExist",
+						"RecordDoesntExist sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          PaymentStatusId as integer,",
+						"          PaymentStatusName as string",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          PaymentStatusName",
+						"     )) ~> CurTragetPaymentStatuses"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/df_GOLDEN_PAYMENTS')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"folder": {
+					"name": "golden"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "ds_curation_payments",
+								"type": "DatasetReference"
+							},
+							"name": "CurPayments"
+						},
+						{
+							"dataset": {
+								"referenceName": "ds_golden_bank_statuses",
+								"type": "DatasetReference"
+							},
+							"name": "GoldBankStatus"
+						},
+						{
+							"dataset": {
+								"referenceName": "ds_golden_payment_statuses",
+								"type": "DatasetReference"
+							},
+							"name": "GoldPaymentStatus"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "ds_golden_payments",
+								"type": "DatasetReference"
+							},
+							"name": "GoldenPayments"
+						}
+					],
+					"transformations": [
+						{
+							"name": "lkpBankStatus"
+						},
+						{
+							"name": "lkpPaymentStatus"
+						},
+						{
+							"name": "SelectColumns"
+						},
+						{
+							"name": "UpdateOrInsert"
+						},
+						{
+							"name": "AddAndCastColumns"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          PaymentId as integer,",
+						"          PaymentIdentifier as string,",
+						"          UniqueCustomerNumber as string,",
+						"          BankStatusCode as string,",
+						"          PaymentStatusName as string,",
+						"          PaymentAmount as decimal(18,2),",
+						"          Deduction as decimal(18,2),",
+						"          PaymentDate as timestamp,",
+						"          CreatedOn as timestamp",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> CurPayments",
+						"source(output(",
+						"          BankStatusId as integer,",
+						"          BankStatusCode as string,",
+						"          BankStatusName as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> GoldBankStatus",
+						"source(output(",
+						"          PaymentStatusId as integer,",
+						"          PaymentStatusName as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> GoldPaymentStatus",
+						"CurPayments, GoldBankStatus lookup(CurPayments@BankStatusCode == GoldBankStatus@BankStatusCode,",
+						"     multiple: false,",
+						"     pickup: 'any',",
+						"     broadcast: 'auto')~> lkpBankStatus",
+						"lkpBankStatus, GoldPaymentStatus lookup(CurPayments@PaymentStatusName == GoldPaymentStatus@PaymentStatusName,",
+						"     multiple: false,",
+						"     pickup: 'any',",
+						"     broadcast: 'auto')~> lkpPaymentStatus",
+						"lkpPaymentStatus select(mapColumn(",
+						"          PaymentIdentifier,",
+						"          UniqueCustomerNumber,",
+						"          BankStatusId,",
+						"          PaymentStatusId,",
+						"          PaymentAmount,",
+						"          Deduction,",
+						"          PaymentDate,",
+						"          CreatedOn",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> SelectColumns",
+						"AddAndCastColumns alterRow(upsertIf(true())) ~> UpdateOrInsert",
+						"SelectColumns derive(ModifiedOn = currentUTC(),",
+						"          BankStatusId = toString(BankStatusId),",
+						"          PaymentStatusId = toString(PaymentStatusId)) ~> AddAndCastColumns",
+						"UpdateOrInsert sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          PaymentId as integer,",
+						"          PaymentIdentifier as string,",
+						"          UniqueCustomerNumber as string,",
+						"          BankStatusId as string,",
+						"          PaymentStatusId as string,",
+						"          PaymentAmount as decimal(18,2),",
+						"          Deduction as decimal(18,2),",
+						"          PaymentDate as timestamp,",
+						"          CreatedOn as timestamp,",
+						"          ModifiedOn as timestamp",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:false,",
+						"     updateable:false,",
+						"     upsertable:true,",
+						"     keys:['PaymentIdentifier'],",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          PaymentIdentifier,",
+						"          UniqueCustomerNumber,",
+						"          BankStatusId,",
+						"          PaymentStatusId,",
+						"          PaymentAmount,",
+						"          Deduction,",
+						"          PaymentDate,",
+						"          CreatedOn,",
+						"          ModifiedOn",
+						"     )) ~> GoldenPayments"
+					]
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_MASTER_BANK_STATUSES')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Ingest Bank Statuses",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_INGEST_BANK_STATUSES",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Curate Bank Statuses",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [
+							{
+								"activity": "Ingest Bank Statuses",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "1.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "df_CURATE_BANK_STATUSES",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"IngBankStatuses": {},
+									"CurBankStatuses": {},
+									"InsertNewBankStatuses": {},
+									"UpdateBankStatuses": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					},
+					{
+						"name": "Golden Bank Statuses",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Curate Bank Statuses",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_GOLDEN_BANK_STATUSES",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/pl_INGEST_BANK_STATUSES')]",
+				"[concat(variables('factoryId'), '/dataflows/df_CURATE_BANK_STATUSES')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_GOLDEN_BANK_STATUSES')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_MASTER_CUSTOMERS')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Curate Customers",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [
+							{
+								"activity": "Ingest Customers",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "1.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "df_CURATE_CUSTOMERS",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"IngCustomers": {},
+									"CurCustomers": {},
+									"AddNewRecords": {},
+									"InsertUpdatedRecords": {},
+									"UpdateValidToAndFlag": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					},
+					{
+						"name": "Ingest Customers",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_INGEST_CUSTOMERS",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Golden Customers",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Curate Customers",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_GOLDEN_CUSTOMERS",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/df_CURATE_CUSTOMERS')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_INGEST_CUSTOMERS')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_GOLDEN_CUSTOMERS')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_MASTER_PAYMENTS')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Ingest Payments",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_INGEST_PAYMENTS",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"windowStart": {
+									"value": "@pipeline().parameters.windowStart",
+									"type": "Expression"
+								},
+								"windowEnd": {
+									"value": "@pipeline().parameters.windowEnd",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Curate Payments",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Ingest Payments",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_CURATE_PAYMENTS",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Golden Payments",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [
+							{
+								"activity": "Curate Payments",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "1.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "df_GOLDEN_PAYMENTS",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"CurPayments": {},
+									"GoldBankStatus": {},
+									"GoldPaymentStatus": {},
+									"GoldenPayments": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"windowStart": {
+						"type": "string"
+					},
+					"windowEnd": {
+						"type": "string"
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/pl_INGEST_PAYMENTS')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_CURATE_PAYMENTS')]",
+				"[concat(variables('factoryId'), '/dataflows/df_GOLDEN_PAYMENTS')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_MASTER_PAYMENT_STATUSES')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Curate Payment Statuses",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [
+							{
+								"activity": "Ingest Payment Statuses",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "1.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "df_CURATE_PAYMENT_STATUSES",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"IngPaymentStatuses": {},
+									"CurPaymentStatuses": {},
+									"CurTragetPaymentStatuses": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					},
+					{
+						"name": "Ingest Payment Statuses",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_INGEST_PAYMENT_STATUSES",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Golden Payment Statuses",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Curate Payment Statuses",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "pl_GOLDEN_PAYMENT_STATUSES",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/df_CURATE_PAYMENT_STATUSES')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_INGEST_PAYMENT_STATUSES')]",
+				"[concat(variables('factoryId'), '/pipelines/pl_GOLDEN_PAYMENT_STATUSES')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/load_payments_every_5min')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Stopped",
+				"pipeline": {
+					"pipelineReference": {
+						"referenceName": "pl_MASTER_PAYMENTS",
+						"type": "PipelineReference"
+					},
+					"parameters": {
+						"windowStart": "[parameters('load_payments_every_5min_properties_pipeline_parameters_windowStart')]",
+						"windowEnd": "[parameters('load_payments_every_5min_properties_pipeline_parameters_windowEnd')]"
+					}
+				},
+				"type": "TumblingWindowTrigger",
+				"typeProperties": {
+					"frequency": "Minute",
+					"interval": 5,
+					"startTime": "2022-04-26T23:00:00Z",
+					"delay": "00:00:00",
+					"maxConcurrency": 50,
+					"retryPolicy": {
+						"intervalInSeconds": 30
+					},
+					"dependsOn": []
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/pl_MASTER_PAYMENTS')]"
+			]
+		}
+	]
+}

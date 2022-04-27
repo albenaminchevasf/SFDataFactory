@@ -1,0 +1,36 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adf-sftraining"
+		},
+		"ls_kv_sf_training_properties_typeProperties_baseUrl": {
+			"value": "https://kv-sftraining.vault.azure.net/"
+		},
+		"ls_sftraining_curation_db_properties_typeProperties_connectionString_secretName": {
+			"value": "curationDB-connectionString"
+		},
+		"ls_sftraining_datalake_properties_typeProperties_url": {
+			"value": "https://sftrainingstorageaccount.dfs.core.windows.net/"
+		},
+		"ls_sftraining_golden_db_properties_typeProperties_connectionString_secretName": {
+			"value": "goldenDB-connectionString"
+		},
+		"ls_sftraining_ingestion_db_properties_typeProperties_connectionString_secretName": {
+			"value": "ingestionDB-connectionString"
+		},
+		"load_payments_every_5min_properties_pipeline_parameters_windowStart": {
+			"value": "@trigger().outputs.windowStartTime"
+		},
+		"load_payments_every_5min_properties_pipeline_parameters_windowEnd": {
+			"value": "@trigger().outputs.windowEndTime"
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}
