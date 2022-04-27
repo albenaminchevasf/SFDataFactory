@@ -1,0 +1,61 @@
+{
+	"name": "ds_ingestion_customers",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sftraining_ingestion_db",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "ingestion"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "CustomerDimId",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "UniqueCustomerNumber",
+				"type": "nvarchar"
+			},
+			{
+				"name": "CustomerName",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Phone",
+				"type": "nvarchar"
+			},
+			{
+				"name": "Email",
+				"type": "nvarchar"
+			},
+			{
+				"name": "BillingAddress",
+				"type": "nvarchar"
+			},
+			{
+				"name": "BillingCity",
+				"type": "nvarchar"
+			},
+			{
+				"name": "BillingPostalCode",
+				"type": "nvarchar"
+			},
+			{
+				"name": "BillingState",
+				"type": "nvarchar"
+			},
+			{
+				"name": "BillingCountryName",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "am",
+			"table": "CustomerDim"
+		}
+	}
+}

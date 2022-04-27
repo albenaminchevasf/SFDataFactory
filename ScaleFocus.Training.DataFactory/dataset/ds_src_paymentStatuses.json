@@ -1,0 +1,32 @@
+{
+	"name": "ds_src_paymentStatuses",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sftraining_datalake",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "src"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": "PaymentStatuses.csv",
+				"folderPath": "paymentstatuses/raw",
+				"fileSystem": "dimensions"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": [
+			{
+				"name": "PaymentStatus",
+				"type": "String"
+			}
+		]
+	}
+}

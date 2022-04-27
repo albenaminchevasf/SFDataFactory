@@ -1,0 +1,29 @@
+{
+	"name": "ds_ingestion_paymentStatuses",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sftraining_ingestion_db",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "ingestion"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "PaymentStatusId",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "PaymentStatusName",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "am",
+			"table": "PaymentStatuses"
+		}
+	}
+}

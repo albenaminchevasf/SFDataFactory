@@ -1,0 +1,79 @@
+{
+	"name": "df_CURATE_PAYMENT_STATUSES",
+	"properties": {
+		"folder": {
+			"name": "curation"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "ds_ingestion_paymentStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "IngPaymentStatuses"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_curation_paymentStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "CurPaymentStatuses"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "ds_curation_paymentStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "CurTragetPaymentStatuses"
+				}
+			],
+			"transformations": [
+				{
+					"name": "RecordDoesntExist"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          PaymentStatusId as integer,",
+				"          PaymentStatusName as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> IngPaymentStatuses",
+				"source(output(",
+				"          PaymentStatusId as integer,",
+				"          PaymentStatusName as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> CurPaymentStatuses",
+				"IngPaymentStatuses, CurPaymentStatuses exists(IngPaymentStatuses@PaymentStatusName == CurPaymentStatuses@PaymentStatusName,",
+				"     negate:true,",
+				"     broadcast: 'auto')~> RecordDoesntExist",
+				"RecordDoesntExist sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          PaymentStatusId as integer,",
+				"          PaymentStatusName as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          PaymentStatusName",
+				"     )) ~> CurTragetPaymentStatuses"
+			]
+		}
+	}
+}

@@ -1,0 +1,9 @@
+{
+	"name": "adf-sftraining",
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "ac743a64-03d5-4674-95b0-34286b984b90",
+		"tenantId": "204cb148-e6fd-421f-825f-cabf6a4a4a55"
+	}
+}

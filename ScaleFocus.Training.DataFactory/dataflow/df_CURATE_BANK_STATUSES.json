@@ -1,0 +1,133 @@
+{
+	"name": "df_CURATE_BANK_STATUSES",
+	"properties": {
+		"folder": {
+			"name": "curation"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "ds_ingestion_bankStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "IngBankStatuses"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_curation_bankStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "CurBankStatuses"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "ds_curation_bankStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "InsertNewBankStatuses"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_curation_bankStatuses",
+						"type": "DatasetReference"
+					},
+					"name": "UpdateBankStatuses"
+				}
+			],
+			"transformations": [
+				{
+					"name": "JoinIngestionAndCuration"
+				},
+				{
+					"name": "split1"
+				},
+				{
+					"name": "RenameColumnsWithSchema"
+				},
+				{
+					"name": "UpdateRecords"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          BankStatusId as integer,",
+				"          BankStatusCode as string,",
+				"          BankStatusName as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> IngBankStatuses",
+				"source(output(",
+				"          BankStatusId as integer,",
+				"          BankStatusCode as string,",
+				"          BankStatusName as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> CurBankStatuses",
+				"IngBankStatuses, CurBankStatuses join(IngBankStatuses@BankStatusCode == CurBankStatuses@BankStatusCode,",
+				"     joinType:'left',",
+				"     broadcast: 'auto')~> JoinIngestionAndCuration",
+				"RenameColumnsWithSchema split(isNull(CUR_BankStatusCode),",
+				"     and(ING_BankStatusCode == CUR_BankStatusCode, ING_BankStatusName != CUR_BankStatusName),",
+				"     disjoint: false) ~> split1@(newRecords, updatedRecords, notChanged)",
+				"JoinIngestionAndCuration select(mapColumn(",
+				"          ING_BankStatusId = IngBankStatuses@BankStatusId,",
+				"          ING_BankStatusCode = IngBankStatuses@BankStatusCode,",
+				"          ING_BankStatusName = IngBankStatuses@BankStatusName,",
+				"          CUR_BankStatusId = CurBankStatuses@BankStatusId,",
+				"          CUR_BankStatusCode = CurBankStatuses@BankStatusCode,",
+				"          CUR_BankStatusName = CurBankStatuses@BankStatusName",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> RenameColumnsWithSchema",
+				"split1@updatedRecords alterRow(updateIf(true())) ~> UpdateRecords",
+				"split1@newRecords sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          BankStatusId as integer,",
+				"          BankStatusCode as string,",
+				"          BankStatusName as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          BankStatusCode = ING_BankStatusCode,",
+				"          BankStatusName = ING_BankStatusName",
+				"     )) ~> InsertNewBankStatuses",
+				"UpdateRecords sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          BankStatusId as integer,",
+				"          BankStatusCode as string,",
+				"          BankStatusName as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:false,",
+				"     updateable:true,",
+				"     upsertable:false,",
+				"     keys:['BankStatusCode'],",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          BankStatusCode = ING_BankStatusCode,",
+				"          BankStatusName = ING_BankStatusName",
+				"     )) ~> UpdateBankStatuses"
+			]
+		}
+	}
+}

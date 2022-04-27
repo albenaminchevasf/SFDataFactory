@@ -1,0 +1,36 @@
+{
+	"name": "ds_src_payments",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sftraining_datalake",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"paymentsContainer": {
+				"type": "string"
+			},
+			"paymentsRootFolder": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "src"
+		},
+		"annotations": [],
+		"type": "Json",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": {
+					"value": "@dataset().paymentsRootFolder",
+					"type": "Expression"
+				},
+				"fileSystem": {
+					"value": "@dataset().paymentsContainer",
+					"type": "Expression"
+				}
+			}
+		},
+		"schema": {}
+	}
+}

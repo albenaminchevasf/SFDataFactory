@@ -1,0 +1,71 @@
+{
+	"name": "ds_golden_payments",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sftraining_golden_db",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "golden"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "PaymentId",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "PaymentIdentifier",
+				"type": "nvarchar"
+			},
+			{
+				"name": "UniqueCustomerNumber",
+				"type": "nvarchar"
+			},
+			{
+				"name": "BankStatusId",
+				"type": "nvarchar"
+			},
+			{
+				"name": "PaymentStatusId",
+				"type": "nvarchar"
+			},
+			{
+				"name": "PaymentAmount",
+				"type": "decimal",
+				"precision": 18,
+				"scale": 2
+			},
+			{
+				"name": "Deduction",
+				"type": "decimal",
+				"precision": 18,
+				"scale": 2
+			},
+			{
+				"name": "PaymentDate",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "CreatedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "ModifiedOn",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			}
+		],
+		"typeProperties": {
+			"schema": "am",
+			"table": "Payments"
+		}
+	}
+}

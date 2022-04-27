@@ -1,0 +1,241 @@
+{
+	"name": "pl_INGEST_PAYMENTS",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Params",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "ds_payments_params",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "Ingest Payments",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Get Params",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"additionalColumns": [
+							{
+								"name": "CreatedOn",
+								"value": {
+									"value": "@utcnow()",
+									"type": "Expression"
+								}
+							}
+						],
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"modifiedDatetimeStart": {
+								"value": "@pipeline().parameters.windowStart",
+								"type": "Expression"
+							},
+							"modifiedDatetimeEnd": {
+								"value": "@pipeline().parameters.windowEnd",
+								"type": "Expression"
+							},
+							"wildcardFileName": "*.json",
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": true,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"path": "$['EnqueuedTimeUtc']"
+								},
+								"sink": {
+									"name": "EnqueuedTimeUtc",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Properties']"
+								},
+								"sink": {
+									"name": "Properties",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['payment_identifier']"
+								},
+								"sink": {
+									"name": "PaymentIdentifier",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['unique_customer_number']"
+								},
+								"sink": {
+									"name": "UniqueCustomerNumber",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['bank_status_code']"
+								},
+								"sink": {
+									"name": "BankStatusCode",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['payment_status_name']"
+								},
+								"sink": {
+									"name": "PaymentStatusName",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['payment_amount']"
+								},
+								"sink": {
+									"name": "PaymentAmount",
+									"type": "Decimal"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['deduction']"
+								},
+								"sink": {
+									"name": "Deduction",
+									"type": "Decimal"
+								}
+							},
+							{
+								"source": {
+									"path": "$['Body']['payment_date']"
+								},
+								"sink": {
+									"name": "PaymentDate",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"path": "$['SystemProperties']"
+								},
+								"sink": {
+									"name": "SystemProperties"
+								}
+							},
+							{
+								"source": {
+									"path": "$['CreatedOn']"
+								},
+								"sink": {
+									"name": "CreatedOn"
+								}
+							}
+						],
+						"collectionReference": "",
+						"mapComplexValuesToString": true
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "ds_src_payments",
+						"type": "DatasetReference",
+						"parameters": {
+							"paymentsContainer": {
+								"value": "@activity('Get Params').output.firstRow.PaymentContainer",
+								"type": "Expression"
+							},
+							"paymentsRootFolder": {
+								"value": "@activity('Get Params').output.firstRow.PaymentRootFolder",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_ingestion_payments",
+						"type": "DatasetReference",
+						"parameters": {
+							"schemaName": {
+								"value": "@activity('Get Params').output.firstRow.SchemaName",
+								"type": "Expression"
+							},
+							"tableName": {
+								"value": "@activity('Get Params').output.firstRow.IngestionTableName",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			}
+		],
+		"parameters": {
+			"windowStart": {
+				"type": "string"
+			},
+			"windowEnd": {
+				"type": "string"
+			}
+		},
+		"annotations": []
+	}
+}

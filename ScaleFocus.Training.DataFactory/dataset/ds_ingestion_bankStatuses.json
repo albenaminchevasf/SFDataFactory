@@ -1,0 +1,33 @@
+{
+	"name": "ds_ingestion_bankStatuses",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sftraining_ingestion_db",
+			"type": "LinkedServiceReference"
+		},
+		"folder": {
+			"name": "ingestion"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "BankStatusId",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "BankStatusCode",
+				"type": "nvarchar"
+			},
+			{
+				"name": "BankStatusName",
+				"type": "nvarchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "am",
+			"table": "BankStatuses"
+		}
+	}
+}

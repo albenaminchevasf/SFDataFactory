@@ -1,0 +1,90 @@
+{
+	"name": "pl_MASTER_PAYMENTS",
+	"properties": {
+		"activities": [
+			{
+				"name": "Ingest Payments",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_INGEST_PAYMENTS",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"windowStart": {
+							"value": "@pipeline().parameters.windowStart",
+							"type": "Expression"
+						},
+						"windowEnd": {
+							"value": "@pipeline().parameters.windowEnd",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Curate Payments",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Ingest Payments",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "pl_CURATE_PAYMENTS",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Golden Payments",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "Curate Payments",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "1.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_GOLDEN_PAYMENTS",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			}
+		],
+		"parameters": {
+			"windowStart": {
+				"type": "string"
+			},
+			"windowEnd": {
+				"type": "string"
+			}
+		},
+		"annotations": []
+	}
+}

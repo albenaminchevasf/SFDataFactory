@@ -1,0 +1,312 @@
+{
+	"name": "df_CURATE_CUSTOMERS",
+	"properties": {
+		"folder": {
+			"name": "curation"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "ds_ingestion_customers",
+						"type": "DatasetReference"
+					},
+					"name": "IngCustomers"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_curation_customers",
+						"type": "DatasetReference"
+					},
+					"name": "CurCustomers"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "ds_curation_customers",
+						"type": "DatasetReference"
+					},
+					"name": "AddNewRecords"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_curation_customers",
+						"type": "DatasetReference"
+					},
+					"name": "InsertUpdatedRecords"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_curation_customers",
+						"type": "DatasetReference"
+					},
+					"name": "UpdateValidToAndFlag"
+				}
+			],
+			"transformations": [
+				{
+					"name": "JoinIngestionAndCuration"
+				},
+				{
+					"name": "SplitNewRecords"
+				},
+				{
+					"name": "RenameColumns"
+				},
+				{
+					"name": "AddColumns"
+				},
+				{
+					"name": "FilterNullValues"
+				},
+				{
+					"name": "AddCurRowSignature"
+				},
+				{
+					"name": "SelectCurComparableColumns"
+				},
+				{
+					"name": "SelectIngComparableColumns"
+				},
+				{
+					"name": "AddIngRowSignature"
+				},
+				{
+					"name": "CompareSignatures"
+				},
+				{
+					"name": "UpdateOldRecords"
+				},
+				{
+					"name": "AddColumns2"
+				},
+				{
+					"name": "AddValidToAndFlagColumns"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          CustomerDimId as integer,",
+				"          UniqueCustomerNumber as string,",
+				"          CustomerName as string,",
+				"          Phone as string,",
+				"          Email as string,",
+				"          BillingAddress as string,",
+				"          BillingCity as string,",
+				"          BillingPostalCode as string,",
+				"          BillingState as string,",
+				"          BillingCountryName as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     format: 'table') ~> IngCustomers",
+				"source(output(",
+				"          CustomerDimId as integer,",
+				"          UniqueCustomerNumber as string,",
+				"          CustomerName as string,",
+				"          Phone as string,",
+				"          Email as string,",
+				"          BillingAddress as string,",
+				"          BillingCity as string,",
+				"          BillingPostalCode as string,",
+				"          BillingState as string,",
+				"          BillingCountryName as string,",
+				"          ValidFrom as timestamp,",
+				"          ValidTo as timestamp,",
+				"          IsActive as boolean",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'select * from am.CustomerDim where IsActive=1',",
+				"     format: 'query') ~> CurCustomers",
+				"FilterNullValues, CurCustomers join(IngCustomers@UniqueCustomerNumber == CurCustomers@UniqueCustomerNumber,",
+				"     joinType:'left',",
+				"     broadcast: 'auto')~> JoinIngestionAndCuration",
+				"RenameColumns split(isNull(CUR_UniqueCustomerNumber),",
+				"     disjoint: false) ~> SplitNewRecords@(newCustomers, existingCustomers)",
+				"JoinIngestionAndCuration select(mapColumn(",
+				"          ING_CustomerDimId = IngCustomers@CustomerDimId,",
+				"          ING_UniqueCustomerNumber = IngCustomers@UniqueCustomerNumber,",
+				"          ING_CustomerName = IngCustomers@CustomerName,",
+				"          ING_Phone = IngCustomers@Phone,",
+				"          ING_Email = IngCustomers@Email,",
+				"          ING_BillingAddress = IngCustomers@BillingAddress,",
+				"          ING_BillingCity = IngCustomers@BillingCity,",
+				"          ING_BillingPostalCode = IngCustomers@BillingPostalCode,",
+				"          ING_BillingState = IngCustomers@BillingState,",
+				"          ING_BillingCountryName = IngCustomers@BillingCountryName,",
+				"          CUR_CustomerDimId = CurCustomers@CustomerDimId,",
+				"          CUR_UniqueCustomerNumber = CurCustomers@UniqueCustomerNumber,",
+				"          CUR_CustomerName = CurCustomers@CustomerName,",
+				"          CUR_Phone = CurCustomers@Phone,",
+				"          CUR_Email = CurCustomers@Email,",
+				"          CUR_BillingAddress = CurCustomers@BillingAddress,",
+				"          CUR_BillingCity = CurCustomers@BillingCity,",
+				"          CUR_BillingPostalCode = CurCustomers@BillingPostalCode,",
+				"          CUR_BillingState = CurCustomers@BillingState,",
+				"          CUR_BillingCountryName = CurCustomers@BillingCountryName,",
+				"          CUR_ValidFrom = ValidFrom,",
+				"          CUR_ValidTo = ValidTo,",
+				"          CUR_IsActive = IsActive",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> RenameColumns",
+				"SplitNewRecords@newCustomers derive(CUR_ValidFrom = currentUTC(),",
+				"          CUR_ValidTo = toTimestamp('9999-12-31 00:00:00'),",
+				"          CUR_IsActive = 1) ~> AddColumns",
+				"IngCustomers filter(!isNull(UniqueCustomerNumber)) ~> FilterNullValues",
+				"SelectCurComparableColumns derive(CUR_signature = sha2(256,columns())) ~> AddCurRowSignature",
+				"CurCustomers select(mapColumn(",
+				"          UniqueCustomerNumber,",
+				"          CustomerName,",
+				"          Phone,",
+				"          Email,",
+				"          BillingAddress,",
+				"          BillingCity,",
+				"          BillingPostalCode,",
+				"          BillingState,",
+				"          BillingCountryName",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> SelectCurComparableColumns",
+				"SplitNewRecords@existingCustomers select(mapColumn(",
+				"          ING_UniqueCustomerNumber,",
+				"          ING_CustomerName,",
+				"          ING_Phone,",
+				"          ING_Email,",
+				"          ING_BillingAddress,",
+				"          ING_BillingCity,",
+				"          ING_BillingPostalCode,",
+				"          ING_BillingState,",
+				"          ING_BillingCountryName,",
+				"          CUR_CustomerDimId",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> SelectIngComparableColumns",
+				"SelectIngComparableColumns derive(ING_signature = sha2(256, ING_UniqueCustomerNumber,ING_CustomerName,ING_Phone,ING_Email,ING_BillingAddress,ING_BillingCity,ING_BillingPostalCode,ING_BillingState,ING_BillingCountryName)) ~> AddIngRowSignature",
+				"AddIngRowSignature, AddCurRowSignature exists(ING_signature == CUR_signature,",
+				"     negate:true,",
+				"     broadcast: 'auto')~> CompareSignatures",
+				"CompareSignatures alterRow(updateIf(true())) ~> UpdateOldRecords",
+				"CompareSignatures derive(CUR_ValidFrom = currentUTC(),",
+				"          CUR_ValidTo = toTimestamp('9999-12-31 00:00:00'),",
+				"          CUR_IsActive = 1) ~> AddColumns2",
+				"UpdateOldRecords derive(CUR_ValidTo = currentUTC(),",
+				"          IsActive = 0) ~> AddValidToAndFlagColumns",
+				"AddColumns sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          CustomerDimId as integer,",
+				"          UniqueCustomerNumber as string,",
+				"          CustomerName as string,",
+				"          Phone as string,",
+				"          Email as string,",
+				"          BillingAddress as string,",
+				"          BillingCity as string,",
+				"          BillingPostalCode as string,",
+				"          BillingState as string,",
+				"          BillingCountryName as string,",
+				"          ValidFrom as timestamp,",
+				"          ValidTo as timestamp,",
+				"          IsActive as boolean",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          UniqueCustomerNumber = ING_UniqueCustomerNumber,",
+				"          CustomerName = ING_CustomerName,",
+				"          Phone = ING_Phone,",
+				"          Email = ING_Email,",
+				"          BillingAddress = ING_BillingAddress,",
+				"          BillingCity = ING_BillingCity,",
+				"          BillingPostalCode = ING_BillingPostalCode,",
+				"          BillingState = ING_BillingState,",
+				"          BillingCountryName = ING_BillingCountryName,",
+				"          ValidFrom = CUR_ValidFrom,",
+				"          ValidTo = CUR_ValidTo,",
+				"          IsActive = CUR_IsActive",
+				"     )) ~> AddNewRecords",
+				"AddColumns2 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          CustomerDimId as integer,",
+				"          UniqueCustomerNumber as string,",
+				"          CustomerName as string,",
+				"          Phone as string,",
+				"          Email as string,",
+				"          BillingAddress as string,",
+				"          BillingCity as string,",
+				"          BillingPostalCode as string,",
+				"          BillingState as string,",
+				"          BillingCountryName as string,",
+				"          ValidFrom as timestamp,",
+				"          ValidTo as timestamp,",
+				"          IsActive as boolean",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          UniqueCustomerNumber = ING_UniqueCustomerNumber,",
+				"          CustomerName = ING_CustomerName,",
+				"          Phone = ING_Phone,",
+				"          Email = ING_Email,",
+				"          BillingAddress = ING_BillingAddress,",
+				"          BillingCity = ING_BillingCity,",
+				"          BillingPostalCode = ING_BillingPostalCode,",
+				"          BillingState = ING_BillingState,",
+				"          BillingCountryName = ING_BillingCountryName,",
+				"          ValidFrom = CUR_ValidFrom,",
+				"          ValidTo = CUR_ValidTo,",
+				"          IsActive = CUR_IsActive",
+				"     )) ~> InsertUpdatedRecords",
+				"AddValidToAndFlagColumns sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          CustomerDimId as integer,",
+				"          UniqueCustomerNumber as string,",
+				"          CustomerName as string,",
+				"          Phone as string,",
+				"          Email as string,",
+				"          BillingAddress as string,",
+				"          BillingCity as string,",
+				"          BillingPostalCode as string,",
+				"          BillingState as string,",
+				"          BillingCountryName as string,",
+				"          ValidFrom as timestamp,",
+				"          ValidTo as timestamp,",
+				"          IsActive as boolean",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:false,",
+				"     updateable:true,",
+				"     upsertable:false,",
+				"     keys:['CustomerDimId'],",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          CustomerDimId = CUR_CustomerDimId,",
+				"          ValidTo = CUR_ValidTo,",
+				"          IsActive",
+				"     )) ~> UpdateValidToAndFlag"
+			]
+		}
+	}
+}
